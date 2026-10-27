@@ -15,7 +15,7 @@ canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 
 /* In-game HUD: visible only while playing (state lives in body[data-mode]). */
 #hud, #hint { opacity: 0; transition: opacity .3s; pointer-events: none; }
-body[data-mode=play] #hud, body[data-mode=play] #hint { opacity: 1; }
+body[data-mode=play] #hud, body[data-mode=pause] #hud, body[data-mode=play] #hint { opacity: 1; }
 #hud { position: fixed; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top, 0px) + 24px) 0 0; text-align: center; }
 #score { font-size: 64px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 #lv { margin-top: 6px; font-size: 15px; color: var(--mute); }
@@ -34,7 +34,7 @@ body[data-mode=play] #hud, body[data-mode=play] #hint { opacity: 1; }
   position: fixed; inset: 0; display: none; flex-direction: column; align-items: center; justify-content: space-between; text-align: center;
   padding: calc(env(safe-area-inset-top, 0px) + 64px) 24px calc(env(safe-area-inset-bottom, 0px) + 28px);
 }
-body[data-mode=title] #title, body.show-over #over { display: flex; }
+body[data-mode=title] #title, body[data-mode=pause] #pause, body.show-over #over { display: flex; }
 .screen h1 { margin: 12px 0; font-size: 60px; line-height: .95; font-weight: 800; letter-spacing: -1px; }
 .sub, .lbl { margin: 0; color: var(--mute); font-size: 15px; }
 .bot { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
@@ -46,11 +46,19 @@ button {
 button.alt { background: transparent; color: var(--ink); min-height: 48px; font-size: 16px; }
 button:focus-visible { outline: 3px solid var(--acc); outline-offset: 3px; }
 
-#over { justify-content: center; background: rgba(20,18,16,.6); }
+#over, #pause { justify-content: center; background: rgba(20,18,16,.6); }
 .card { width: 100%; max-width: 340px; padding: 28px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; border-radius: 20px; border: 2px solid var(--ink); background: var(--bg); color: var(--ink); }
 .card .lbl { font-size: 16px; }
 #fs { font-size: 72px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 #nb { margin: 0; min-height: 20px; font-weight: 700; color: var(--acc); }
 .card button { margin-top: 6px; }
+
+[hidden] { display: none !important; }
+#pausebtn { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); right: calc(env(safe-area-inset-right, 0px) + 16px); width: 48px; height: 48px; min-height: 0; padding: 0; border-radius: 14px; background: transparent; color: var(--ink); display: none; place-items: center; }
+body[data-mode=play] #pausebtn { display: grid; }
+.toggles { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
+.card .toggles { margin-top: 0; }
+.toggle { width: auto; min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 14px; }
+.toggle[aria-pressed=false] { opacity: .6; border-style: dashed; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

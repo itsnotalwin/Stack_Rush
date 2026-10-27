@@ -25,6 +25,7 @@
   <div id="pop"></div>
 </div>
 <div id="banner" aria-live="polite"><b id="bt"></b><span id="bs"></span></div>
+<button id="pausebtn" aria-label="Pause"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.5"/><rect x="14" y="5" width="4" height="14" rx="1.5"/></svg></button>
 <p id="hint">Tap anywhere to drop</p>
 
 <section id="title" class="screen">
@@ -32,6 +33,10 @@
     <p class="lbl">Best: <b id="b1">0</b> blocks, level <b id="b2">1</b></p>
     <h1>Stack<br>Rush</h1>
     <p class="sub">One thumb. Perfect drops. Don’t miss.</p>
+    <div class="toggles">
+      <button class="toggle alt" data-setting="sound"></button>
+      <button class="toggle alt" data-setting="vibrate"></button>
+    </div>
   </div>
   <div class="bot">
     <button id="go">Tap to start</button>
@@ -48,6 +53,19 @@
     <p class="lbl">Best: <b id="fb">0</b></p>
     <button id="again">Play again</button>
     <button id="share" class="alt">Share score</button>
+  </div>
+</section>
+
+<section id="pause" class="screen">
+  <div class="card" role="dialog" aria-label="Paused">
+    <p class="lbl">Paused</p>
+    <p class="lbl" id="pstat"></p>
+    <button id="resume">Resume</button>
+    <div class="toggles">
+      <button class="toggle alt" data-setting="sound"></button>
+      <button class="toggle alt" data-setting="vibrate"></button>
+    </div>
+    <button id="endrun" class="alt">End run</button>
   </div>
 </section>
 

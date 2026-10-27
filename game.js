@@ -14,6 +14,10 @@ const LEVEL_LEN = 10;         // blocks per level
 const VIEW_ROWS = 6;          // tower rows kept on screen below the swinging block
 const BASE_Y = 130;           // gap between the screen bottom and the base block
 const SPEED_CAP = 560;
+const SQUASH = 0.2;           // how much a block flattens when it lands (0.2 = 20%)
+const SQUASH_TIME = 0.16;     // seconds the landing squash lasts
+const RESUME_HOLD = 0.6;      // seconds the block stays still after Resume, so you can get ready
+const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];   // semitones above C4; a perfect streak climbs this scale
 const THEME_PER_LEVEL = true; // set to false to keep the first (cream) theme for every level
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const MODIFIERS = { Pulse: 'Speed rises and falls', Rush: 'Faster, with a bigger width bonus' };
@@ -30,7 +34,7 @@ const THEMES = [
 ];
 
 /* ---------- save data ---------- */
-const save = { best: 0, level: 1, blocks: 0, games: 0 };
+const save = { best: 0, level: 1, blocks: 0, games: 0, sound: true, vibrate: true };
 try { Object.assign(save, JSON.parse(localStorage.getItem('sr-save') || '{}')); } catch {}
 const persist = () => { try { localStorage.setItem('sr-save', JSON.stringify(save)); } catch {} };
 
@@ -39,7 +43,8 @@ const $ = id => document.getElementById(id);
 const ui = {
   cv: $('cv'), score: $('score'), level: $('lv'), bar: $('barf'), pop: $('pop'),
   banner: $('banner'), bannerTitle: $('bt'), bannerNote: $('bs'), bestScore: $('b1'), bestLevel: $('b2'),
-  finalScore: $('fs'), newBest: $('nb'), stat: $('stat'), finalBest: $('fb'), share: $('share')
+  finalScore: $('fs'), newBest: $('nb'), stat: $('stat'), finalBest: $('fb'), share: $('share'),
+  pauseBtn: $('pausebtn'), resume: $('resume'), endRun: $('endrun'), pauseStat: $('pstat')
 };
 const ctx = ui.cv.getContext('2d');
 const rootStyle = document.documentElement.style;
@@ -61,23 +66,29 @@ const sound = {
   },
   tone(freq, { type = 'triangle', len = 0.2, gain = 0.15, delay = 0 } = {}) {
     const c = this.ctx;
-    if (!c) return;
+    if (!c || !save.sound) return;
     const t = c.currentTime + delay, osc = c.createOscillator(), vol = c.createGain();
     osc.type = type; osc.frequency.value = freq;
-    vol.gain.setValueAtTime(gain, t); vol.gain.exponentialRampToValueAtTime(0.001, t + len);
+    vol.gain.setValueAtTime(0.0001, t);
+    vol.gain.linearRampToValueAtTime(gain, t + 0.01);          // short attack avoids clicks
+    vol.gain.exponentialRampToValueAtTime(0.001, t + len);
     osc.connect(vol).connect(c.destination); osc.start(t); osc.stop(t + len);
   },
-  land(combo) { this.tone(combo ? 440 * 2 ** (Math.min(combo, 12) / 6) : 330); },
+  land(combo) {
+    if (!combo) return this.tone(196, { len: 0.18 });                       // a chop: one low, soft note
+    const f = 261.63 * 2 ** (PENTATONIC[Math.min(combo - 1, PENTATONIC.length - 1)] / 12);
+    this.tone(f); this.tone(f * 2, { gain: 0.04, len: 0.15 });              // the note plus a quiet octave, like a chime
+  },
   fail() { this.tone(110, { type: 'sawtooth', len: 0.35 }); },
   levelUp() { [523, 659, 784].forEach((f, i) => this.tone(f, { delay: i * 0.09 })); }
 };
-const buzz = pattern => { try { navigator.vibrate?.(pattern); } catch {} };
+const buzz = pattern => { try { if (save.vibrate) navigator.vibrate?.(pattern); } catch {} };
 
 /* ---------- state ---------- */
 const G = {
   mode: 'title',                       // 'title' | 'play' | 'over'
   blocks: [], mover: null, debris: [], sparks: [],
-  score: 0, combo: 0, perfects: 0, clock: 0, cam: 0, shake: 0, newBest: false,
+  score: 0, combo: 0, perfects: 0, clock: 0, cam: 0, shake: 0, newBest: false, landT: 1, hold: 0,
   theme: THEMES[0]
 };
 const V = { S: 1, H: MIN_H, ox: 0 };                 // canvas scale, logical height, left offset that centres the field
@@ -132,7 +143,7 @@ function reset({ decor = false } = {}) {
   setTheme(THEMES[0]);
   Object.assign(G, {
     blocks: [{ x: (W - MAX_W) / 2, w: MAX_W, col: G.theme.p[0] }],
-    debris: [], sparks: [], score: 0, combo: 0, perfects: 0, clock: 0, cam: 0, shake: 0, newBest: false
+    debris: [], sparks: [], score: 0, combo: 0, perfects: 0, clock: 0, cam: 0, shake: 0, newBest: false, landT: 1, hold: 0
   });
   if (decor) {                                        // a small leaning tower behind the title screen
     for (let i = 1; i < 5; i++) {
@@ -148,9 +159,21 @@ function start() {
   ui.banner.classList.remove('show');
 }
 
-function end() {
+function pause() {
+  if (G.mode !== 'play') return;
+  ui.pauseStat.textContent = `Score ${G.score}, level ${level()}`;
+  setMode('pause');
+}
+
+function resume() {
+  if (G.mode !== 'pause') return;
+  setMode('play'); G.hold = RESUME_HOLD;
+}
+
+function end({ quit = false } = {}) {                 // quit = the player chose to end the run from the pause screen
   setMode('over');
-  G.shake = REDUCED_MOTION ? 0 : 14; buzz([40, 40, 80]); sound.fail();
+  G.shake = REDUCED_MOTION || quit ? 0 : 14;
+  if (!quit) { buzz([40, 40, 80]); sound.fail(); }
   G.newBest = G.score > save.best;
   save.best = Math.max(save.best, G.score); save.level = Math.max(save.level, level());
   save.blocks += G.score; save.games++; persist();
@@ -159,20 +182,20 @@ function end() {
   ui.newBest.textContent = G.newBest ? 'New best!' : '';
   ui.stat.textContent = `Level ${level()}, ${G.perfects} perfect ${G.perfects === 1 ? 'drop' : 'drops'}`;
   ui.share.textContent = 'Share score';
-  setTimeout(() => { if (G.mode === 'over') document.body.classList.add('show-over'); }, 600);   // let the falling block land first
+  setTimeout(() => { if (G.mode === 'over') document.body.classList.add('show-over'); }, quit ? 0 : 600);   // let the falling block land first
 }
 
 const chunk = (x, w, row, col) => ({ x, w, row, col, drop: 0, vy: 0 });
 
 function drop() {
-  if (G.mode !== 'play') return;
+  if (G.mode !== 'play' || G.hold > 0) return;
   const t = topBlock(), m = G.mover, row = G.blocks.length;
   const left = Math.max(m.x, t.x), overlap = Math.min(m.x + m.w, t.x + t.w) - left;
   if (overlap <= 0) { G.debris.push(chunk(m.x, m.w, row, m.col)); end(); return; }   // clean miss
   if (Math.abs(m.x - t.x) < perfectTolerance()) landPerfect(m, t, row);
   else landChopped(m, t, row, left, overlap);
   G.blocks.push({ x: m.x, w: m.w, col: m.col });
-  G.score++;
+  G.score++; G.landT = 0;
   if (G.score % LEVEL_LEN === 0) levelUp();
   syncHud(); spawnMover();
 }
@@ -219,8 +242,9 @@ async function shareScore() {
 
 /* ---------- per-frame update ---------- */
 function update(dt) {
-  G.clock += dt;
-  if (G.mode === 'play') {
+  if (G.mode === 'pause') return;                     // everything freezes while paused
+  G.clock += dt; G.landT += dt; G.hold = Math.max(0, G.hold - dt);
+  if (G.mode === 'play' && G.hold === 0) {
     const m = G.mover;
     m.x += m.dir * speed() * dt;
     if (m.x < 0) { m.x = 0; m.dir = 1; } else if (m.x + m.w > W) { m.x = W - m.w; m.dir = -1; }
@@ -241,9 +265,12 @@ function rrect(x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
 }
 
-function drawBlock(x, y, w, col) {
+const landSquash = () => (REDUCED_MOTION ? 1 : 1 - SQUASH * Math.max(0, 1 - G.landT / SQUASH_TIME) ** 2);
+
+function drawBlock(x, y, w, col, squash = 1) {          // squash < 1 flattens the block and widens it a touch, anchored at its base
   if (w <= 0 || y > V.H || y < -BLOCK_H) return;
-  ctx.fillStyle = col; rrect(x, y, w, BLOCK_H - 3, 6); ctx.fill();
+  const h = (BLOCK_H - 3) * squash, grow = (1 - squash) * w * 0.25;
+  ctx.fillStyle = col; rrect(x - grow / 2, y + (BLOCK_H - 3) - h, w + grow, h, 6); ctx.fill();
 }
 
 function render() {
@@ -251,7 +278,8 @@ function render() {
   ctx.clearRect(0, 0, ui.cv.width, ui.cv.height);
   const jx = (Math.random() - 0.5) * G.shake, jy = (Math.random() - 0.5) * G.shake;
   ctx.setTransform(V.S, 0, 0, V.S, (V.ox + jx) * V.S, jy * V.S);
-  G.blocks.forEach((b, i) => drawBlock(b.x, rowY(i), b.w, b.col));
+  const last = G.blocks.length - 1;
+  G.blocks.forEach((b, i) => drawBlock(b.x, rowY(i), b.w, b.col, i === last ? landSquash() : 1));
   if (G.mode === 'play') drawBlock(G.mover.x, rowY(G.blocks.length), G.mover.w, G.mover.col);
   for (const d of G.debris) drawBlock(d.x, rowY(d.row) + d.drop, d.w, d.col);
   ctx.fillStyle = G.theme.p[2];
@@ -261,10 +289,34 @@ function render() {
 
 /* ---------- input and boot ---------- */
 ui.cv.addEventListener('pointerdown', e => { e.preventDefault(); drop(); });
-addEventListener('keydown', e => { if (e.code === 'Space' && G.mode === 'play') { e.preventDefault(); drop(); } });
-$('title').addEventListener('click', start);
+addEventListener('keydown', e => {
+  if (e.code === 'Space' && G.mode === 'play') { e.preventDefault(); drop(); }
+  else if (e.code === 'KeyP' || e.code === 'Escape') { if (G.mode === 'play') pause(); else if (G.mode === 'pause') resume(); }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });   // leaving the app pauses the run
+ui.pauseBtn.addEventListener('click', pause);
+ui.resume.addEventListener('click', resume);
+ui.endRun.addEventListener('click', () => end({ quit: true }));
+$('title').addEventListener('click', e => { if (!e.target.closest('.toggle')) start(); });
 $('again').addEventListener('click', start);
 ui.share.addEventListener('click', shareScore);
+
+/* settings: the same toggle buttons appear on the title and pause screens */
+const SETTING_LABELS = { sound: ['Sound on', 'Sound off'], vibrate: ['Vibration on', 'Vibration off'] };
+function syncSettings() {
+  document.querySelectorAll('.toggle').forEach(el => {
+    const key = el.dataset.setting;
+    el.textContent = SETTING_LABELS[key][save[key] ? 0 : 1];
+    el.setAttribute('aria-pressed', save[key]);
+    if (key === 'vibrate') el.hidden = !('vibrate' in navigator);   // iPhones have no vibration API
+  });
+}
+document.querySelectorAll('.toggle').forEach(el => el.addEventListener('click', () => {
+  const key = el.dataset.setting;
+  save[key] = !save[key]; persist(); syncSettings();
+  if (key === 'sound') { sound.unlock(); sound.tone(440); }       // a short tone confirms sound is on
+  else buzz(20);
+}));
 addEventListener('resize', fit);
 
 let lastTime = 0;
@@ -275,7 +327,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-fit(); reset({ decor: true }); setMode('title');
+syncSettings(); fit(); reset({ decor: true }); setMode('title');
 ui.bestScore.textContent = save.best; ui.bestLevel.textContent = save.level;
 requestAnimationFrame(frame);
 if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
