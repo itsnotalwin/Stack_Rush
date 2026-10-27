@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Stack Rush</title>
 <meta name="description" content="One-thumb tower stacking game with endless levels. Works offline.">
-<meta name="theme-color" content="#F8D3D8">
+<meta name="theme-color" content="#F4EFE6">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -29,25 +29,23 @@
 
 <section id="title" class="screen">
   <div>
-    <div class="chips"><span>Best <b id="b1">0</b></span><span>Level <b id="b2">1</b></span></div>
-    <h1 class="logo" aria-label="Stack Rush">
-      <span class="word" data-w="STACK" aria-hidden="true"></span>
-      <span class="word" data-w="RUSH" style="--w:1" aria-hidden="true"></span>
-    </h1>
+    <p class="lbl">Best: <b id="b1">0</b> blocks, level <b id="b2">1</b></p>
+    <h1>Stack<br>Rush</h1>
     <p class="sub">One thumb. Perfect drops. Don’t miss.</p>
   </div>
   <div class="bot">
     <button id="go">Tap to start</button>
-    <p class="sub">Works offline once loaded</p>
+    <p class="lbl">Works offline once loaded</p>
   </div>
 </section>
 
 <section id="over" class="screen">
   <div class="card" role="dialog" aria-label="Game over">
-    <p class="sub">Game over</p>
+    <p class="lbl">Game over</p>
     <div id="fs">0</div>
-    <p id="nb" class="badge" hidden>New best!</p>
-    <div class="chips"><span>Level <b id="fl">1</b></span><span>Perfects <b id="fp">0</b></span><span>Best <b id="fb">0</b></span></div>
+    <p id="nb"></p>
+    <p class="lbl" id="stat"></p>
+    <p class="lbl">Best: <b id="fb">0</b></p>
     <button id="again">Play again</button>
     <button id="share" class="alt">Share score</button>
   </div>
