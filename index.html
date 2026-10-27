@@ -5,171 +5,54 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <title>Stack Rush</title>
 <meta name="description" content="One-thumb tower stacking game with endless levels. Works offline.">
-<meta name="theme-color" content="#F4EFE6">
+<meta name="theme-color" content="#F8D3D8">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Stack Rush">
-<style>
-:root{--bg:#F4EFE6;--ink:#1E1B18;--mute:#5F574E;--acc:#B8401B}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-html,body{margin:0;height:100%;overflow:hidden;background-color:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;touch-action:none;overscroll-behavior:none;transition:background-color .8s,color .8s}
-canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
-#fade{position:fixed;left:0;right:0;bottom:0;height:150px;background:linear-gradient(transparent,var(--bg) 65%);pointer-events:none}
-#hud{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top,0px) + 24px) 0 0;text-align:center;pointer-events:none;opacity:0;transition:opacity .3s}
-#score{font-size:64px;font-weight:800;line-height:1}
-#lv{margin-top:6px;font-size:15px;color:var(--mute)}
-#bar{width:120px;height:6px;margin:8px auto 0;border-radius:3px;background:rgba(128,128,128,.3);overflow:hidden}
-#bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
-#pop{height:28px;margin-top:10px;font-size:18px;font-weight:700;color:var(--acc);opacity:0;transition:opacity .2s}
-#banner{position:fixed;left:0;right:0;top:30%;text-align:center;pointer-events:none;opacity:0;transform:scale(.92);transition:opacity .3s,transform .3s}
-#banner.show{opacity:1;transform:none}
-#bt{display:block;font-size:48px;font-weight:800;letter-spacing:-1px}
-#bs{display:block;margin-top:6px;font-size:16px;color:var(--mute)}
-#hint{position:fixed;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 32px);margin:0;text-align:center;color:var(--mute);font-size:15px;opacity:0;transition:opacity .3s;pointer-events:none}
-.screen{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:space-between;text-align:center;padding:calc(env(safe-area-inset-top,0px) + 64px) 24px calc(env(safe-area-inset-bottom,0px) + 28px)}
-.screen.on{display:flex}
-.screen h1{margin:12px 0;font-size:60px;line-height:.95;font-weight:800;letter-spacing:-1px}
-.sub,.lbl{margin:0;color:var(--mute);font-size:15px}
-.bot{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px}
-button{font:inherit;width:100%;max-width:320px;min-height:56px;border-radius:14px;border:2px solid var(--ink);background:var(--ink);color:var(--bg);font-size:18px;font-weight:700;cursor:pointer}
-button.alt{background:transparent;color:var(--ink);min-height:48px;font-size:16px}
-button:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
-#over{justify-content:center;background:rgba(20,18,16,.6)}
-.card{width:100%;max-width:340px;padding:28px 24px;border-radius:20px;background:var(--bg);color:var(--ink);border:2px solid var(--ink);display:flex;flex-direction:column;align-items:center;gap:10px}
-.card .lbl{font-size:16px}
-#fs{font-size:72px;font-weight:800;line-height:1}
-#nb{margin:0;min-height:20px;font-weight:700;color:var(--acc)}
-.card button{margin-top:6px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
-<body>
-<canvas id="cv"></canvas><div id="fade"></div>
-<div id="hud"><div id="score">0</div><div id="lv">Level 1</div><div id="bar"><i id="barf"></i></div><div id="pop"></div></div>
-<div id="banner"><b id="bt"></b><span id="bs"></span></div>
+<body data-mode="title">
+<canvas id="cv" role="img" aria-label="Stack Rush game board"></canvas>
+<div class="bottom-fade"></div>
+
+<div id="hud">
+  <div id="score">0</div>
+  <div id="lv">Level 1</div>
+  <div id="bar"><i id="barf"></i></div>
+  <div id="pop"></div>
+</div>
+<div id="banner" aria-live="polite"><b id="bt"></b><span id="bs"></span></div>
 <p id="hint">Tap anywhere to drop</p>
-<section id="title" class="screen on">
-  <div><p class="lbl">Best: <b id="b1">0</b> blocks, level <b id="b2">1</b></p><h1>Stack<br>Rush</h1><p class="sub">One thumb. Perfect drops. Don’t miss.</p></div>
-  <div class="bot"><button id="go">Tap to start</button><p class="lbl">Works offline once loaded</p></div>
+
+<section id="title" class="screen">
+  <div>
+    <div class="chips"><span>Best <b id="b1">0</b></span><span>Level <b id="b2">1</b></span></div>
+    <h1 class="logo" aria-label="Stack Rush">
+      <span class="word" data-w="STACK" aria-hidden="true"></span>
+      <span class="word" data-w="RUSH" style="--w:1" aria-hidden="true"></span>
+    </h1>
+    <p class="sub">One thumb. Perfect drops. Don’t miss.</p>
+  </div>
+  <div class="bot">
+    <button id="go">Tap to start</button>
+    <p class="sub">Works offline once loaded</p>
+  </div>
 </section>
-<section id="over" class="screen"><div class="card">
-  <p class="lbl">Game over</p><div id="fs">0</div><p id="nb"></p><p class="lbl" id="stat"></p><p class="lbl">Best: <b id="fb">0</b></p>
-  <button id="again">Play again</button><button id="share" class="alt">Share score</button>
-</div></section>
-<script>
-(()=>{
-const $=id=>document.getElementById(id),cv=$('cv'),g=cv.getContext('2d'),root=document.documentElement.style;
-const W=400,BH=28,LEN=10,RM=matchMedia('(prefers-reduced-motion:reduce)').matches;
-const TH=[
- {n:'Dawn',bg:'#F4EFE6',ink:'#1E1B18',mute:'#5F574E',acc:'#B8401B',p:['#2F6F6A','#D9A441','#E8643C','#6B5B95']},
- {n:'Mint',bg:'#E3F1EA',ink:'#12261E',mute:'#3F5A4E',acc:'#A63A14',p:['#1F7A5A','#E0A82E','#D4543A','#3B6EA5']},
- {n:'Sky',bg:'#E4EEF8',ink:'#14202E',mute:'#435569',acc:'#B0381A',p:['#2B5F9E','#F2B134','#E4572E','#2A9D8F']},
- {n:'Sunset',bg:'#F8E7DA',ink:'#2B1A14',mute:'#6A4A3C',acc:'#A8321E',p:['#C2452D','#E9A23B','#7A3E6B','#2F6F6A']},
- {n:'Dusk',bg:'#1C2233',ink:'#F2EEE6',mute:'#B7BDCC',acc:'#FF9A6B',p:['#4FB3A9','#F2C14E','#FF7A59','#9B8CFF']},
- {n:'Ember',bg:'#221513',ink:'#F6E9DD',mute:'#C9B5A6',acc:'#FFB04A',p:['#FF6B4A','#FFC857','#E2506B','#8AD6C4']}];
-const MD={Pulse:'Speed rises and falls',Rush:'Faster, with a bigger width bonus'};
-const mod=L=>L%5===0?'Rush':L%3===0?'Pulse':'';
-let S,H,OX,AC,st='title',th=TH[0],blocks,m,cam,score,combo,perf,clock=0,parts,deb,shake,nb;
-let sv={b:0,l:1,t:0,g:0};
-try{Object.assign(sv,JSON.parse(localStorage.getItem('sr-save')||'{}'))}catch(e){}
-const save=()=>{try{localStorage.setItem('sr-save',JSON.stringify(sv))}catch(e){}};
-const lvl=()=>Math.floor(score/LEN)+1;
-$('b1').textContent=sv.b;$('b2').textContent=sv.l;
-function theme(L){
-  th=TH[(L-1)%TH.length];
-  root.setProperty('--bg',th.bg);root.setProperty('--ink',th.ink);root.setProperty('--mute',th.mute);root.setProperty('--acc',th.acc);
-  const mt=document.querySelector('meta[name=theme-color]');if(mt)mt.content=th.bg}
-function fit(){
-  const d=Math.min(devicePixelRatio||1,2);cv.width=Math.round(innerWidth*d);cv.height=Math.round(innerHeight*d);
-  S=Math.min(cv.width/W,cv.height/640);H=cv.height/S;OX=(cv.width/S-W)/2}
-addEventListener('resize',fit);fit();
-const Y=l=>H-130-(l-cam)*BH;
-function spd(){
-  const L=lvl(),k=mod(L);let s=150+(L-1)*24+(score%LEN)*3;
-  if(k==='Rush')s*=1.2;if(k==='Pulse')s*=1+.35*Math.sin(clock*3);
-  return Math.min(s,560)}
-function spawn(){const t=blocks[blocks.length-1],left=blocks.length%2===0;m={x:left?0:W-t.w,w:t.w,d:left?1:-1,col:th.p[blocks.length%4]}}
-function hud(){$('score').textContent=score;$('lv').textContent='Level '+lvl();$('barf').style.width=(score%LEN)*100/LEN+'%'}
-function reset(){theme(1);blocks=[{x:W/2-80,w:160,col:th.p[0]}];score=0;combo=0;perf=0;parts=[];deb=[];shake=0;cam=0;clock=0;spawn();hud()}
-reset();
-for(let i=1;i<5;i++){const p=blocks[i-1];blocks.push({x:p.x+(i%2?3:-2),w:p.w-i*2,col:th.p[i%4]})}
-function start(){
-  AUD();reset();st='play';nb=false;$('hud').style.opacity=1;$('hint').style.opacity=1;
-  $('title').classList.remove('on');$('over').classList.remove('on');$('banner').classList.remove('show')}
-function end(){
-  st='over';shake=RM?0:14;buzz([40,40,80]);beep(-1);
-  nb=score>sv.b;sv.b=Math.max(sv.b,score);sv.l=Math.max(sv.l,lvl());sv.t+=score;sv.g++;save();
-  $('fs').textContent=score;$('fb').textContent=sv.b;$('b1').textContent=sv.b;$('b2').textContent=sv.l;
-  $('nb').textContent=nb?'New best!':'';
-  $('stat').textContent='Level '+lvl()+', '+perf+' perfect '+(perf===1?'drop':'drops');$('share').textContent='Share score';
-  $('hud').style.opacity=0;$('hint').style.opacity=0;
-  setTimeout(()=>{if(st==='over')$('over').classList.add('on')},600)}
-function levelUp(){
-  const L=lvl(),k=mod(L),t=blocks[blocks.length-1],nw=Math.min(160,t.w+(k==='Rush'?28:14));
-  theme(L);t.x=Math.min(Math.max(0,t.x-(nw-t.w)/2),W-nw);t.w=nw;
-  for(let i=0;i<3;i++)burst(W/2,Y(blocks.length-1));
-  [3,5,7].forEach((n,i)=>setTimeout(()=>beep(n),i*90));buzz([20,30,20]);
-  banner('Level '+L,k?k+': '+MD[k]:th.n)}
-function drop(){
-  if(st!=='play')return;
-  const t=blocks[blocks.length-1],l=blocks.length,a=Math.max(m.x,t.x),ov=Math.min(m.x+m.w,t.x+t.w)-a;
-  if(ov<=0){deb.push({x:m.x,w:m.w,l,o:0,vy:0,col:m.col});end();return}
-  if(Math.abs(m.x-t.x)<4+spd()/60){
-    combo++;perf++;m.x=t.x;
-    if(combo>=3&&m.w<160){m.w=Math.min(160,m.w+8);m.x=Math.min(m.x,W-m.w)}
-    burst(m.x+m.w/2,Y(l)+BH/2);pop('Perfect x'+combo);beep(combo);buzz(15)
-  }else{
-    combo=0;
-    if(m.x<t.x)deb.push({x:m.x,w:t.x-m.x,l,o:0,vy:0,col:m.col});
-    else deb.push({x:t.x+t.w,w:m.x+m.w-(t.x+t.w),l,o:0,vy:0,col:m.col});
-    m.x=a;m.w=ov;beep(0);buzz(8)}
-  blocks.push({x:m.x,w:m.w,col:m.col});score++;
-  if(score%LEN===0)levelUp();
-  hud();spawn()}
-function pop(t){const e=$('pop');e.textContent=t;e.style.opacity=1;clearTimeout(pop.t);pop.t=setTimeout(()=>e.style.opacity=0,600)}
-function banner(a,b){$('bt').textContent=a;$('bs').textContent=b;$('banner').classList.add('show');clearTimeout(banner.t);banner.t=setTimeout(()=>$('banner').classList.remove('show'),1600)}
-function burst(x,y){for(let i=0;i<14;i++)parts.push({x,y,vx:(Math.random()-.5)*300,vy:-Math.random()*260,life:.5})}
-function AUD(){try{AC=AC||new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume()}catch(e){}}
-function beep(n){
-  if(!AC)return;const o=AC.createOscillator(),v=AC.createGain(),t=AC.currentTime;
-  o.type=n<0?'sawtooth':'triangle';o.frequency.value=n<0?110:n?440*Math.pow(1.0595,Math.min(n,12)*2):330;
-  v.gain.setValueAtTime(.15,t);v.gain.exponentialRampToValueAtTime(.001,t+.2);
-  o.connect(v);v.connect(AC.destination);o.start();o.stop(t+.2)}
-function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
-function update(dt){
-  clock+=dt;
-  if(st==='play'){
-    m.x+=m.d*spd()*dt;
-    if(m.x<0){m.x=0;m.d=1}else if(m.x+m.w>W){m.x=W-m.w;m.d=-1}}
-  cam+=(Math.max(0,blocks.length-6)-cam)*Math.min(1,dt*5);
-  deb.forEach(d=>{d.vy+=1400*dt;d.o+=d.vy*dt});deb=deb.filter(d=>d.o<H);
-  parts.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=800*dt;p.life-=dt});parts=parts.filter(p=>p.life>0);
-  shake=shake>.3?shake*Math.pow(.01,dt):0}
-function blk(x,y,w,c){
-  if(y>H||y<-BH)return;g.fillStyle=c;g.beginPath();
-  if(g.roundRect)g.roundRect(x,y,w,BH-3,6);else g.rect(x,y,w,BH-3);g.fill()}
-function draw(){
-  g.setTransform(1,0,0,1,0,0);g.clearRect(0,0,cv.width,cv.height);
-  g.setTransform(S,0,0,S,(OX+(Math.random()-.5)*shake)*S,(Math.random()-.5)*shake*S);
-  blocks.forEach((b,i)=>blk(b.x,Y(i),b.w,b.col));
-  if(st==='play')blk(m.x,Y(blocks.length),m.w,m.col);
-  deb.forEach(d=>blk(d.x,Y(d.l)+d.o,d.w,d.col));
-  g.fillStyle=th.p[2];parts.forEach(p=>{g.globalAlpha=Math.min(1,p.life*2);g.fillRect(p.x,p.y,4,4)});g.globalAlpha=1}
-let last=0;
-function loop(t){const dt=Math.min((t-last)/1000,.05);last=t;update(dt);draw();requestAnimationFrame(loop)}
-requestAnimationFrame(loop);
-cv.addEventListener('pointerdown',e=>{e.preventDefault();drop()});
-addEventListener('keydown',e=>{if(e.code==='Space'&&st==='play'){e.preventDefault();drop()}});
-$('title').onclick=start;$('again').onclick=start;
-$('share').onclick=async()=>{
-  const t='I stacked '+score+' blocks (level '+lvl()+') in Stack Rush!',u=location.href;
-  try{if(navigator.share)await navigator.share({title:'Stack Rush',text:t,url:u});
-  else{await navigator.clipboard.writeText(t+' '+u);$('share').textContent='Copied!'}}catch(e){}};
-if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-})();
-</script>
+
+<section id="over" class="screen">
+  <div class="card" role="dialog" aria-label="Game over">
+    <p class="sub">Game over</p>
+    <div id="fs">0</div>
+    <p id="nb" class="badge" hidden>New best!</p>
+    <div class="chips"><span>Level <b id="fl">1</b></span><span>Perfects <b id="fp">0</b></span><span>Best <b id="fb">0</b></span></div>
+    <button id="again">Play again</button>
+    <button id="share" class="alt">Share score</button>
+  </div>
+</section>
+
+<script src="game.js"></script>
 </body>
 </html>
