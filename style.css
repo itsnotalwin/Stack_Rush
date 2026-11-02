@@ -1,9 +1,5 @@
-/* Colours come from game.js (setTheme) through these registered properties, so every use of them fades smoothly. */
-@property --bg   { syntax: '<color>'; inherits: true; initial-value: #F4EFE6; }
-@property --ink  { syntax: '<color>'; inherits: true; initial-value: #1E1B18; }
-@property --mute { syntax: '<color>'; inherits: true; initial-value: #5F574E; }
-@property --acc  { syntax: '<color>'; inherits: true; initial-value: #B8401B; }
-:root { --bg: #F4EFE6; --ink: #1E1B18; --mute: #5F574E; --acc: #B8401B; transition: --bg .8s, --ink .8s, --mute .8s, --acc .8s; }
+/* The sky colours are set from game.js (applySky) as the tower climbs; these are the starting values. */
+:root { --bg: #F4EFE6; --ink: #1E1B18; --mute: #5F574E; --acc: #B8401B; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
 html, body {
@@ -28,6 +24,12 @@ body[data-mode=play] #hud, body[data-mode=pause] #hud, body[data-mode=play] #hin
 #banner.show { opacity: 1; transform: none; }
 #bt { display: block; font-size: 48px; font-weight: 800; letter-spacing: -1px; }
 #bs { display: block; margin-top: 6px; font-size: 16px; color: var(--mute); }
+#bm { display: block; margin-top: 12px; font-size: 15px; color: var(--mute); }
+#bc { display: block; margin-top: 4px; font-size: 15px; font-weight: 700; color: var(--acc); }
+.dots { display: inline-flex; gap: 6px; margin-left: 8px; vertical-align: middle; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--acc); }
+.dots i.on { background: var(--acc); }
+#savedot { display: inline-block; width: 10px; height: 10px; margin-left: 8px; border-radius: 50%; border: 2px solid var(--acc); vertical-align: middle; }
 
 /* Full-screen panels: shown by body state, never toggled one by one from JS. */
 .screen {
@@ -58,7 +60,11 @@ button:focus-visible { outline: 3px solid var(--acc); outline-offset: 3px; }
 body[data-mode=play] #pausebtn { display: grid; }
 .toggles { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 18px; }
 .card .toggles { margin-top: 0; }
-.toggle { width: auto; min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 14px; }
+.toggles + .toggles { margin-top: 10px; }
+.toggle, .pill { width: auto; min-height: 44px; padding: 0 12px; border-radius: 999px; font-size: 14px; }
 .toggle[aria-pressed=false] { opacity: .6; border-style: dashed; }
+
+/* text colour follows the sky, so it eases between dark and light instead of snapping */
+#score, #lv, #hint, .sub, .lbl, .chips span, h1 { transition: color .3s; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
