@@ -1,7 +1,8 @@
 'use strict';
 /*
  * Stack Rush: a one-thumb tower stacker.
- * Sections: config, themes, save data, sound, state, rules, drawing, input and boot.
+ * Sections: config, sky, save data, sound, state, rules, drawing, input and boot. Colour sets live in sets.js, the share image in
+ * share.js, and the stats, sets and share panels in screens.js (loaded after this file).
  * Plain top-level script (no build step), so every piece can be inspected from the browser console.
  */
 
@@ -16,6 +17,12 @@ const BASE_Y = 130;           // gap between the screen bottom and the base bloc
 const SQUASH = 0.2;           // how much a block flattens when it lands (0.2 = 20%)
 const SQUASH_TIME = 0.16;     // seconds the landing squash lasts
 const RESUME_HOLD = 0.6;      // seconds the block stays still after Resume, so you can get ready
+const HARD_START_W = 80;      // Hard mode starts with a narrow tower
+const MODES = {
+  classic: { name: 'Classic', note: 'Classic: the speed rises every level.' },
+  zen:     { name: 'Zen',     note: 'Zen: the speed never rises. Levels and medals are not counted.' },
+  hard:    { name: 'Hard',    note: 'Hard: you start with a narrow tower.' }
+};
 const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24];   // semitones above C4; a perfect streak climbs this scale
 const PRACTICE_LEVEL = Math.min(999, Math.max(1, Math.floor(Number(new URLSearchParams(location.search).get('level'))) || 1));   // ?level=25 starts a practice run there
 const PRACTICE = PRACTICE_LEVEL > 1;
@@ -38,6 +45,7 @@ const MODIFIERS = [                                   // level twists: the first
   { name: 'Brittle', every: 7, note: 'Chops cost extra width' }
 ];
 const modifierOf = lv => MODIFIERS.find(m => lv % m.every === 0)?.name || '';
+const activeModifier = lv => (save.variant === 'zen' ? '' : modifierOf(lv));   // Zen has no level twists
 const modifierNote = name => MODIFIERS.find(m => m.name === name).note;
 const medalFor = perfects => (perfects >= TUNING.medalGold ? 3 : perfects >= TUNING.medalSilver ? 2 : 1);
 
@@ -93,7 +101,11 @@ function paletteAt(h) {                                  // block colours: the n
 }
 
 /* ---------- save data ---------- */
-const save = { best: 0, level: 1, blocks: 0, games: 0, sound: true, vibrate: true, medals: {}, checkpoint: 1 };
+const SAVE_DEFAULTS = {                               // also the list of fields a restored backup may set
+  best: 0, bestZen: 0, bestHard: 0, level: 1, blocks: 0, games: 0, drops: 0, perfects: 0, streak: 0, checkpoint: 1,
+  sound: true, vibrate: true, set: 'auto', variant: 'classic', installHidden: false, medals: {}
+};
+const save = { ...SAVE_DEFAULTS, medals: {} };
 try { Object.assign(save, JSON.parse(localStorage.getItem('sr-save') || '{}')); } catch {}
 const persist = () => { try { localStorage.setItem('sr-save', JSON.stringify(save)); } catch {} };
 
@@ -101,7 +113,7 @@ const persist = () => { try { localStorage.setItem('sr-save', JSON.stringify(sav
 const $ = id => document.getElementById(id);
 const ui = {
   cv: $('cv'), score: $('score'), level: $('lvt'), saveDot: $('savedot'), bar: $('barf'), pop: $('pop'),
-  banner: $('banner'), bannerTitle: $('bt'), bannerNote: $('bs'), bannerMedal: $('bm'), bannerCp: $('bc'), bestMedals: $('b3'), bestScore: $('b1'), bestLevel: $('b2'),
+  banner: $('banner'), bannerTitle: $('bt'), bannerNote: $('bs'), bannerMedal: $('bm'), bannerCp: $('bc'), records: $('rec'), modeNote: $('modenote'),
   finalScore: $('fs'), newBest: $('nb'), stat: $('stat'), finalBest: $('fb'), share: $('share'),
   pauseBtn: $('pausebtn'), resume: $('resume'), endRun: $('endrun'), pauseStat: $('pstat')
 };
@@ -149,7 +161,7 @@ const G = {
   mode: 'title',                       // 'title' | 'play' | 'over'
   blocks: [], mover: null, debris: [], sparks: [],
   score: 0, combo: 0, perfects: 0, clock: 0, cam: 0, shake: 0, newBest: false, landT: 1, hold: 0,
-  saves: 0, levelPerfects: 0, medalsRun: 0, startLevel: 1,
+  saves: 0, levelPerfects: 0, medalsRun: 0, startLevel: 1, drops: 0, bestStreak: 0,
   sky: 0, skyNow: null                  // sky = the height (in blocks) the background has drifted to; it eases toward the score
 };
 const V = { S: 1, H: MIN_H, ox: 0 };                 // canvas scale, logical height, left offset that centres the field
@@ -175,7 +187,7 @@ function setMode(mode) {
 const skyVars = {};
 function applySky(s) {                                   // page text and buttons follow the sky, always in the colour that reads best
   const bot = s.bot, mid = mixArr(s.top, s.bot, 0.5), ink = inkFor(mid);
-  const vars = { '--bg': toHex(bot), '--ink': toHex(ink), '--mute': toHex(mixArr(ink, bot, 0.32).map(Math.round)), '--acc': toHex(contrast(ACC_ON_LIGHT_RGB, mid) >= contrast(ACC_ON_DARK_RGB, mid) ? ACC_ON_LIGHT_RGB : ACC_ON_DARK_RGB) };
+  const vars = { '--top': toHex(s.top), '--bg': toHex(bot), '--ink': toHex(ink), '--mute': toHex(mixArr(ink, bot, 0.32).map(Math.round)), '--acc': toHex(contrast(ACC_ON_LIGHT_RGB, mid) >= contrast(ACC_ON_DARK_RGB, mid) ? ACC_ON_LIGHT_RGB : ACC_ON_DARK_RGB) };
   for (const key in vars) if (skyVars[key] !== vars[key]) { skyVars[key] = vars[key]; rootStyle.setProperty(key, vars[key]); }
 }
 function refreshSky() {
@@ -187,7 +199,8 @@ const syncMeta = () => document.querySelector('meta[name=theme-color]')?.setAttr
 
 /* ---------- rules ---------- */
 function speed() {
-  const lv = level(), mod = modifierOf(lv);
+  if (save.variant === 'zen') return TUNING.speedBase * 1.15;   // Zen: a calm, constant pace
+  const lv = level(), mod = activeModifier(lv);
   let s = TUNING.speedBase + (lv - 1) * TUNING.speedPerLevel + (G.score % LEVEL_LEN) * TUNING.speedPerBlock;
   if (mod === 'Rush') s *= TUNING.rushSpeed;
   if (mod === 'Pulse') s *= 1 + TUNING.pulseDepth * Math.sin(G.clock * 3);
@@ -195,9 +208,14 @@ function speed() {
 }
 const perfectTolerance = () => 4 + speed() / 60;      // logical px; grows with speed so fast levels stay fair
 
+function blockLook(n, height) {                       // colour (and shine) of the n-th block, from the chosen colour set
+  const set = activeSet();
+  return { col: set.p ? set.p[n % 4] : paletteAt(height)[n % 4], shine: !!set.shine };
+}
+
 function spawnMover() {
   const t = topBlock(), fromLeft = G.blocks.length % 2 === 0;
-  G.mover = { x: fromLeft ? 0 : W - t.w, w: t.w, dir: fromLeft ? 1 : -1, col: paletteAt(G.score)[G.blocks.length % 4] };
+  G.mover = { x: fromLeft ? 0 : W - t.w, w: t.w, dir: fromLeft ? 1 : -1, ...blockLook(G.blocks.length, G.score) };
 }
 
 function syncHud() {
@@ -208,8 +226,17 @@ function syncHud() {
 }
 
 const medalTotal = () => Object.values(save.medals).reduce((a, b) => a + b, 0);
-function syncRecords() {                              // title and checkpoint buttons follow the saved records
-  ui.bestScore.textContent = save.best; ui.bestLevel.textContent = save.level; ui.bestMedals.textContent = medalTotal();
+const bestKey = () => ({ classic: 'best', zen: 'bestZen', hard: 'bestHard' }[save.variant]);
+function rich(node, parts) {                          // numbers are shown in bold
+  node.replaceChildren(...parts.map(p => {
+    if (typeof p !== 'number') return document.createTextNode(p);
+    const b = document.createElement('b'); b.textContent = p; return b;
+  }));
+}
+function syncRecords() {                              // the title label and checkpoint buttons follow the saved records
+  const v = save.variant;
+  if (v === 'zen') rich(ui.records, ['Zen best: ', save.bestZen, ' blocks']);
+  else rich(ui.records, [v === 'hard' ? 'Hard best: ' : 'Best: ', save[bestKey()], ' blocks, level ', save.level, ', ', medalTotal(), ' medals']);
   document.querySelectorAll('.cp').forEach(el => {
     el.hidden = save.checkpoint < TUNING.checkpointEvery;
     el.textContent = `Start at level ${save.checkpoint}`;
@@ -217,15 +244,16 @@ function syncRecords() {                              // title and checkpoint bu
 }
 
 function reset({ decor = false } = {}) {
+  const baseW = save.variant === 'hard' ? HARD_START_W : MAX_W;
   Object.assign(G, {
-    blocks: [{ x: (W - MAX_W) / 2, w: MAX_W, col: paletteAt(0)[0] }],
+    blocks: [{ x: (W - baseW) / 2, w: baseW, ...blockLook(0, 0) }],
     debris: [], sparks: [], score: 0, combo: 0, perfects: 0, clock: 0, cam: 0, shake: 0, newBest: false, landT: 1, hold: 0,
-    saves: 0, levelPerfects: 0, medalsRun: 0, startLevel: 1
+    saves: 0, levelPerfects: 0, medalsRun: 0, startLevel: 1, drops: 0, bestStreak: 0
   });
   if (decor) {                                        // a small leaning tower behind the title screen
     for (let i = 1; i < 5; i++) {
       const p = G.blocks[i - 1];
-      G.blocks.push({ x: p.x + (i % 2 ? 3 : -2), w: p.w - i * 2, col: paletteAt(0)[i % 4] });
+      G.blocks.push({ x: p.x + (i % 2 ? 3 : -2), w: p.w - i * 2, ...blockLook(i, 0) });
     }
   }
   spawnMover(); syncHud();
@@ -255,13 +283,16 @@ function end({ quit = false } = {}) {                 // quit = the player chose
   G.shake = REDUCED_MOTION || quit ? 0 : 14;
   if (!quit) { buzz([40, 40, 80]); sound.fail(); }
   const fromStart = G.startLevel === 1;              // checkpoint runs count toward best level and medals, not best score
-  G.newBest = !PRACTICE && fromStart && G.score > save.best;
+  const key = bestKey(), ranked = save.variant !== 'zen';   // Zen runs only have their own best score
+  G.newBest = !PRACTICE && fromStart && G.score > save[key];
   if (!PRACTICE) {                                    // practice runs never touch your records
-    if (fromStart) save.best = Math.max(save.best, G.score);
-    save.level = Math.max(save.level, level());
-    save.blocks += G.score - (G.startLevel - 1) * LEVEL_LEN; save.games++; persist();
+    if (fromStart) save[key] = Math.max(save[key], G.score);
+    if (ranked) save.level = Math.max(save.level, level());
+    save.blocks += G.score - (G.startLevel - 1) * LEVEL_LEN; save.games++;
+    save.drops += G.drops; save.perfects += G.perfects; save.streak = Math.max(save.streak, G.bestStreak);
+    persist();
   }
-  ui.finalScore.textContent = G.score; ui.finalBest.textContent = save.best; syncRecords();
+  ui.finalScore.textContent = G.score; ui.finalBest.textContent = save[key]; syncRecords();
   ui.newBest.textContent = G.newBest ? 'New best!' : '';
   const medals = G.medalsRun ? `, ${G.medalsRun} ${G.medalsRun === 1 ? 'medal' : 'medals'}` : '';
   ui.stat.textContent = `Level ${level()}, ${G.perfects} perfect ${G.perfects === 1 ? 'drop' : 'drops'}${medals}`;
@@ -269,14 +300,14 @@ function end({ quit = false } = {}) {                 // quit = the player chose
   setTimeout(() => { if (G.mode === 'over') document.body.classList.add('show-over'); }, quit ? 0 : 600);   // let the falling block land first
 }
 
-const chunk = (x, w, row, col) => ({ x, w, row, col, drop: 0, vy: 0 });
+const chunk = (x, w, row, col, shine) => ({ x, w, row, col, shine, drop: 0, vy: 0 });
 
 function drop() {
   if (G.mode !== 'play' || G.hold > 0) return;
   const t = topBlock(), m = G.mover, row = G.blocks.length;
   const left = Math.max(m.x, t.x), overlap = Math.min(m.x + m.w, t.x + t.w) - left;
   if (overlap <= 0) {                                 // a clean miss
-    G.debris.push(chunk(m.x, m.w, row, m.col));
+    G.debris.push(chunk(m.x, m.w, row, m.col, m.shine));
     if (G.saves < 1) { end(); return; }
     G.saves--; G.combo = 0; spawnMover(); syncHud();  // a second chance turns the miss into a retry
     ui.pop.textContent = 'Second chance used'; flashClass(ui.pop, 900); sound.second(); buzz([20, 30, 20]);
@@ -284,14 +315,14 @@ function drop() {
   }
   if (Math.abs(m.x - t.x) < perfectTolerance()) landPerfect(m, t, row);
   else landChopped(m, t, row, left, overlap);
-  G.blocks.push({ x: m.x, w: m.w, col: m.col });
-  G.score++; G.landT = 0;
+  G.blocks.push({ x: m.x, w: m.w, col: m.col, shine: m.shine });
+  G.score++; G.drops++; G.landT = 0;
   if (G.score % LEVEL_LEN === 0) levelUp();
   syncHud(); spawnMover();
 }
 
 function landPerfect(m, t, row) {
-  G.combo++; G.perfects++; G.levelPerfects++; m.x = t.x;
+  G.combo++; G.perfects++; G.levelPerfects++; G.bestStreak = Math.max(G.bestStreak, G.combo); m.x = t.x;
   if (G.combo >= TUNING.regrowStreak && m.w < MAX_W) { m.w = Math.min(MAX_W, m.w + TUNING.regrow); m.x = Math.min(m.x, W - m.w); }   // streaks regrow the block
   burst(m.x + m.w / 2, rowY(row) + BLOCK_H / 2, 14, m.col);
   if (G.combo % TUNING.saveStreak === 0 && G.saves < 1) { G.saves = 1; ui.pop.textContent = 'Second chance ready'; sound.second(); }
@@ -302,46 +333,45 @@ function landPerfect(m, t, row) {
 function landChopped(m, t, row, left, overlap) {
   G.combo = 0;
   const cutX = m.x < t.x ? m.x : t.x + t.w, cutW = m.x < t.x ? t.x - m.x : m.x + m.w - (t.x + t.w);
-  G.debris.push(chunk(cutX, cutW, row, m.col));
+  G.debris.push(chunk(cutX, cutW, row, m.col, m.shine));
   m.x = left; m.w = overlap;
-  if (modifierOf(level()) === 'Brittle') { const cut = m.w * TUNING.brittleCut; m.x += cut / 2; m.w -= cut; }   // Brittle levels: chops cost extra
+  if (activeModifier(level()) === 'Brittle') { const cut = m.w * TUNING.brittleCut; m.x += cut / 2; m.w -= cut; }   // Brittle levels: chops cost extra
   sound.land(0); buzz(8);
 }
 
 function levelUp() {
-  const lv = level(), done = lv - 1, mod = modifierOf(lv), t = topBlock();
+  const lv = level(), done = lv - 1, mod = activeModifier(lv), t = topBlock();
   const w = Math.min(MAX_W, t.w + (mod === 'Rush' ? TUNING.rushWidthBonus : TUNING.widthBonus));   // reward: a wider tower
   t.x = Math.min(Math.max(0, t.x - (w - t.w) / 2), W - w); t.w = w;
   const medal = medalFor(G.levelPerfects);            // medal for the level just finished, from its perfect drops
-  G.medalsRun += medal; G.levelPerfects = 0;
-  const checkpoint = !PRACTICE && lv % TUNING.checkpointEvery === 0 && lv > save.checkpoint;
-  if (!PRACTICE) {
+  const ranked = !PRACTICE && save.variant !== 'zen';   // practice and Zen runs never count toward your records
+  if (ranked) G.medalsRun += medal;
+  G.levelPerfects = 0;
+  const before = unlockedIds(), checkpoint = ranked && lv % TUNING.checkpointEvery === 0 && lv > save.checkpoint;
+  if (ranked) {
     save.medals[done] = Math.max(save.medals[done] || 0, medal);
+    save.level = Math.max(save.level, lv);
     if (checkpoint) save.checkpoint = lv;
     persist(); syncRecords();
   }
-  for (let i = 0; i < 3; i++) burst(W / 2, rowY(G.blocks.length - 1), 14, paletteAt(G.score)[i]);
+  const fresh = ranked ? SETS.filter(x => setUnlocked(x) && !before.includes(x.id)) : [];
+  for (let i = 0; i < 3; i++) burst(W / 2, rowY(G.blocks.length - 1), 14, blockLook(i, G.score).col);
   sound.levelUp(); buzz([20, 30, 20]);
   ui.bannerTitle.textContent = 'Level ' + lv;
   ui.bannerNote.textContent = mod ? `${mod}: ${modifierNote(mod)}` : G.skyNow.name;
-  const label = document.createElement('span'), dots = document.createElement('span');
-  label.textContent = `Level ${done} medal`; dots.className = 'dots';
-  dots.append(...[1, 2, 3].map(n => { const d = document.createElement('i'); if (n <= medal) d.className = 'on'; return d; }));
-  ui.bannerMedal.replaceChildren(label, dots);
-  ui.bannerCp.textContent = checkpoint ? `Checkpoint saved: you can start at level ${lv}` : '';
+  if (save.variant === 'zen') ui.bannerMedal.replaceChildren();
+  else {
+    const label = document.createElement('span'), dots = document.createElement('span');
+    label.textContent = `Level ${done} medal`; dots.className = 'dots';
+    dots.append(...[1, 2, 3].map(n => { const d = document.createElement('i'); if (n <= medal) d.className = 'on'; return d; }));
+    ui.bannerMedal.replaceChildren(label, dots);
+  }
+  ui.bannerCp.textContent = [checkpoint ? `Checkpoint saved: you can start at level ${lv}` : '', fresh.length ? `Unlocked: ${fresh.map(x => x.name).join(', ')}` : ''].filter(Boolean).join('\n');
   flashClass(ui.banner, 2000);
 }
 
 function burst(x, y, n, col) {
   for (let i = 0; i < n; i++) G.sparks.push({ x, y, col, vx: (Math.random() - 0.5) * 300, vy: -Math.random() * 260, life: 0.5 });
-}
-
-async function shareScore() {
-  const text = `I stacked ${G.score} blocks (level ${level()}) in Stack Rush!`;
-  try {
-    if (navigator.share) await navigator.share({ title: 'Stack Rush', text, url: location.href });
-    else { await navigator.clipboard.writeText(`${text} ${location.href}`); ui.share.textContent = 'Copied!'; }
-  } catch {}
 }
 
 /* ---------- per-frame update ---------- */
@@ -390,6 +420,26 @@ function drawSky() {
     ctx.fillRect(o.u * w, (o.v * h + G.cam * BLOCK_H * V.S * o.par) % h, o.s * V.S, o.s * V.S);
   }
   ctx.globalAlpha = 1;
+  if (stars > 0.5) drawMoon(w, h, Math.min(1, (stars - 0.5) * 2));
+  if (stars > 0.8 && !REDUCED_MOTION) drawShootingStar(w, h);
+}
+
+function drawMoon(w, h, k) {                          // a thin crescent that drifts down slowly as you climb
+  const r = 22 * V.S, cx = w * 0.78, cy = h * 0.2 + G.cam * BLOCK_H * V.S * 0.03;
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, w, h);
+  ctx.arc(cx + r * 0.5, cy - r * 0.12, r * 0.85, 0, Math.PI * 2); ctx.clip('evenodd');   // everything except a second, offset circle
+  ctx.globalAlpha = 0.9 * k; ctx.fillStyle = LIGHT_INK;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+
+function drawShootingStar(w, h) {                     // every few seconds a streak crosses the night sky
+  const period = 9, t = (G.clock % period) / 0.8;
+  if (t >= 1) return;
+  const n = Math.floor(G.clock / period), x0 = w * (0.1 + (n * 0.37) % 0.5), y0 = h * (0.08 + (n * 0.23) % 0.2);
+  const dx = w * 0.3 * t, dy = h * 0.14 * t;
+  ctx.globalAlpha = 1 - t; ctx.strokeStyle = LIGHT_INK; ctx.lineWidth = 2 * V.S; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x0 + dx - w * 0.08, y0 + dy - h * 0.035); ctx.lineTo(x0 + dx, y0 + dy); ctx.stroke();
+  ctx.globalAlpha = 1;
 }
 
 function rrect(x, y, w, h, r) {
@@ -401,10 +451,20 @@ function rrect(x, y, w, h, r) {
 
 const landSquash = () => (REDUCED_MOTION ? 1 : 1 - SQUASH * Math.max(0, 1 - G.landT / SQUASH_TIME) ** 2);
 
-function drawBlock(x, y, w, col, squash = 1) {          // squash < 1 flattens the block and widens it a touch, anchored at its base
+const tint = (hex, to, k) => toHex(mixArr(parseHex(hex), to, k).map(Math.round));   // blend a colour toward white or black
+
+function drawBlock(x, y, w, col, squash = 1, shine = false, seed = 0) {   // squash < 1 flattens the block and widens it a touch, anchored at its base
   if (w <= 0 || y > V.H || y < -BLOCK_H) return;
-  const h = (BLOCK_H - 3) * squash, grow = (1 - squash) * w * 0.25;
-  ctx.fillStyle = col; rrect(x - grow / 2, y + (BLOCK_H - 3) - h, w + grow, h, 6); ctx.fill();
+  const h = (BLOCK_H - 3) * squash, grow = (1 - squash) * w * 0.25, top = y + (BLOCK_H - 3) - h, bx = x - grow / 2, bw = w + grow;
+  if (!shine) { ctx.fillStyle = col; rrect(bx, top, bw, h, 6); ctx.fill(); return; }
+  const g = ctx.createLinearGradient(0, top, 0, top + h);          // shiny sets: a metallic gradient and a moving glint
+  g.addColorStop(0, tint(col, [255, 255, 255], 0.55)); g.addColorStop(0.45, col); g.addColorStop(1, tint(col, [0, 0, 0], 0.3));
+  ctx.fillStyle = g; rrect(bx, top, bw, h, 6); ctx.fill();
+  ctx.save(); rrect(bx, top, bw, h, 6); ctx.clip();
+  const gx = bx + (REDUCED_MOTION ? bw * 0.3 : (G.clock * 70 + seed * 53) % (bw + 90) - 45);
+  ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath();
+  ctx.moveTo(gx, top); ctx.lineTo(gx + 12, top); ctx.lineTo(gx - 6, top + h); ctx.lineTo(gx - 18, top + h); ctx.closePath(); ctx.fill();
+  ctx.restore();
 }
 
 function render() {
@@ -413,9 +473,9 @@ function render() {
   const jx = (Math.random() - 0.5) * G.shake, jy = (Math.random() - 0.5) * G.shake;
   ctx.setTransform(V.S, 0, 0, V.S, (V.ox + jx) * V.S, jy * V.S);
   const last = G.blocks.length - 1;
-  G.blocks.forEach((b, i) => drawBlock(b.x, rowY(i), b.w, b.col, i === last ? landSquash() : 1));
-  if (G.mode === 'play') drawBlock(G.mover.x, rowY(G.blocks.length), G.mover.w, G.mover.col);
-  for (const d of G.debris) drawBlock(d.x, rowY(d.row) + d.drop, d.w, d.col);
+  G.blocks.forEach((b, i) => drawBlock(b.x, rowY(i), b.w, b.col, i === last ? landSquash() : 1, b.shine, i));
+  if (G.mode === 'play') drawBlock(G.mover.x, rowY(G.blocks.length), G.mover.w, G.mover.col, 1, G.mover.shine, 99);
+  for (const d of G.debris) drawBlock(d.x, rowY(d.row) + d.drop, d.w, d.col, 1, d.shine, 7);
   for (const s of G.sparks) { ctx.globalAlpha = Math.min(1, s.life * 2); ctx.fillStyle = s.col; ctx.fillRect(s.x, s.y, 4, 4); }
   ctx.globalAlpha = 1;
 }
@@ -430,10 +490,9 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 ui.pauseBtn.addEventListener('click', pause);
 ui.resume.addEventListener('click', resume);
 ui.endRun.addEventListener('click', () => end({ quit: true }));
-$('title').addEventListener('click', e => { if (!e.target.closest('.toggle, .pill')) start(); });
+$('title').addEventListener('click', e => { if (!e.target.closest('.toggle, .pill, .seg, .strip')) start(); });
 $('again').addEventListener('click', () => start());
 document.querySelectorAll('.cp').forEach(el => el.addEventListener('click', () => start(save.checkpoint)));
-ui.share.addEventListener('click', shareScore);
 
 /* settings: the same toggle buttons appear on the title and pause screens */
 const SETTING_LABELS = { sound: ['Sound on', 'Sound off'], vibrate: ['Vibration on', 'Vibration off'] };
@@ -464,4 +523,3 @@ function frame(now) {
 syncSettings(); fit(); reset({ decor: true }); refreshSky(); syncMeta(); setMode('title');
 syncRecords();
 requestAnimationFrame(frame);
-if ('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

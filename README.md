@@ -3,7 +3,7 @@
 One-thumb tower stacker with endless levels. Installable PWA that works offline after the first visit.
 
 ## Files
-- `index.html`, `style.css`, `game.js`: markup, styling and all game code (no build step).
+- `index.html`, `style.css`: markup and styling. `game.js`: the game itself. `sets.js`: colour sets and their unlock rules. `share.js`: the share image. `screens.js`: the stats, colour sets and share panels, the mode picker, and the install and update prompts. No build step.
 - `sw.js`: offline cache. `manifest.webmanifest` and `icons/`: install metadata.
 
 ## Deploy on GitHub Pages
@@ -26,6 +26,9 @@ The background is a sky that drifts gradually through a day as the tower climbs:
 
 ## Medals, second chance and checkpoints
 Finishing a level earns a medal from its perfect drops: one for clearing it, two for 6 or more perfects, three for 9 or more. A streak of 10 perfect drops earns a second chance (a small ring beside the level): the next full miss becomes a retry instead of the end. Every 5th level you reach is a checkpoint you can start from; checkpoint runs count toward best level and medals but not best score. Level twists: Rush (levels 5, 10, 15...), Pulse (3, 6, 9...) and Brittle (7, 14, 21...: chops cost extra width).
+
+## Colour sets, modes and stats
+Pick colour sets on the title screen. Auto follows the sky; the others unlock by reaching levels (Morning 3, Sunset 6, Night 12, Deep night 16) or collecting medals (Bronze 15, Silver 40) and gold medals on 10 levels (Shiny gold). Set `UNLOCK_ALL = true` in `sets.js` to open them all. Modes: Classic, Zen (constant speed, no twists, own best score, nothing counts toward levels or medals) and Hard (starts with a narrow tower). The Stats screen shows your totals, a medal tile for each level, and lets you copy or restore a save code.
 
 ## Controls and settings
 Pause with the button in the top-right corner (or P / Esc). The game also pauses itself when you leave the app. Sound and vibration can be switched off on the title and pause screens, and the choice is remembered. Vibration is hidden on devices that don't support it (iPhone).

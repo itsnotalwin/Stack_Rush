@@ -1,6 +1,6 @@
 // Bump V when you want every device to drop its old cache immediately.
-const V = 'stack-rush-v9';
-const FILES = ['./', 'index.html', 'style.css', 'game.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
+const V = 'stack-rush-v10';
+const FILES = ['./', 'index.html', 'style.css', 'sets.js', 'share.js', 'game.js', 'screens.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });

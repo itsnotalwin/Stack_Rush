@@ -29,13 +29,28 @@
 <p id="hint">Tap anywhere to drop</p>
 
 <section id="title" class="screen">
+  <div id="install" class="strip" hidden>
+    <span id="installtext"></span>
+    <button id="installbtn" class="pill" hidden>Install</button>
+    <button id="installx" class="x" aria-label="Dismiss">&times;</button>
+  </div>
   <div>
-    <p class="lbl">Best: <b id="b1">0</b> blocks, level <b id="b2">1</b>, <b id="b3">0</b> medals</p>
+    <p class="lbl" id="rec"></p>
     <h1>Stack<br>Rush</h1>
     <p class="sub">One thumb. Perfect drops. Don’t miss.</p>
+    <div class="modes" role="group" aria-label="Mode">
+      <button class="seg" data-variant="classic">Classic</button>
+      <button class="seg" data-variant="zen">Zen</button>
+      <button class="seg" data-variant="hard">Hard</button>
+    </div>
+    <p class="sub" id="modenote"></p>
     <div class="toggles">
       <button class="toggle alt" data-setting="sound"></button>
       <button class="toggle alt" data-setting="vibrate"></button>
+    </div>
+    <div class="toggles">
+      <button class="pill alt" id="openSets">Colour sets</button>
+      <button class="pill alt" id="openStats">Stats</button>
     </div>
     <div class="toggles"><button class="pill alt cp" hidden></button></div>
   </div>
@@ -71,6 +86,44 @@
   </div>
 </section>
 
+<section id="sets" class="screen panel">
+  <button class="pill alt back" data-close="sets">Back</button>
+  <h2>Colour sets</h2>
+  <p class="sub left">Pick the blocks you build with. Reach new levels and collect medals to unlock more.</p>
+  <div class="scroll"><div id="setgrid" class="setgrid"></div></div>
+  <button data-close="sets">Done</button>
+</section>
+
+<section id="stats" class="screen panel">
+  <button class="pill alt back" data-close="stats">Back</button>
+  <h2>Your stats</h2>
+  <div class="scroll">
+    <div id="statchips" class="statchips"></div>
+    <h3>Medals</h3>
+    <div id="medalgrid" class="medalgrid"></div>
+    <h3>Achievements</h3>
+    <div id="achlist"></div>
+    <p class="sub left">Browsers can clear saved data. Keep a backup.</p>
+    <div class="row2"><button class="alt" id="copycode">Copy save code</button><button class="alt" id="restorecode">Restore from code</button></div>
+  </div>
+</section>
+
+<section id="sharesheet" class="screen panel sheet">
+  <div class="sheetbox" role="dialog" aria-label="Share your score">
+    <p class="lbl strong">Share your score</p>
+    <canvas id="sharecv" width="1080" height="1080"></canvas>
+    <button id="sharego">Share</button>
+    <button id="shareimg" class="alt">Save image</button>
+    <button id="sharecopy" class="link">Copy link</button>
+    <button class="link" data-close="share">Close</button>
+  </div>
+</section>
+
+<div id="toast" role="status" hidden><span>New version ready</span><button id="reloadbtn" class="pill">Reload</button></div>
+
+<script src="sets.js"></script>
+<script src="share.js"></script>
 <script src="game.js"></script>
+<script src="screens.js"></script>
 </body>
 </html>

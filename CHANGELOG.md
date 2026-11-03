@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4
+- Colour sets that unlock through play (levels reached and medals collected), picked from the title screen. Auto follows the sky; Bronze, Silver and Shiny gold are metallic sets with a moving glint. `UNLOCK_ALL` in `sets.js` opens everything.
+- Modes: Classic, Zen (constant speed, no twists, its own best score) and Hard (starts narrow).
+- Stats screen: totals, a medal tile for every level coloured by its sky, achievements, and a save backup you can copy and restore.
+- A moon and the occasional shooting star in the night sky.
+
+## 1.3
+- Share card: a score image you can share, save or copy as a link.
+- Install strip on the title screen (Add to Home Screen hint on iPhone) and a "New version ready" notice when an update has downloaded.
+
 ## 1.2
 - Level medals: one to three per level, based on perfect drops. Your best medal per level is saved.
 - Second chance: a streak of 10 perfect drops lets your next full miss become a retry.
